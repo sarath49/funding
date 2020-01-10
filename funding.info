@@ -1,0 +1,5 @@
+name = Funding
+description = Post Crowdfunding links and widgets for OpenCollective and similar platforms.
+core = 7.x
+package = Fields
+dependencies[] = link:link
