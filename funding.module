@@ -1,0 +1,198 @@
+<?php
+
+/**
+ * @file
+ * Provide link formatters and widgets for OpenCollective and similar platforms.
+ */
+
+/**
+ * Implements hook_help().
+ */
+function funding_help($path, $arg) {
+  switch ($path) {
+    case 'admin/help#funding':
+      return t("Provide link formatters and widgets for OpenCollective and similar platforms.");
+  }
+}
+
+/**
+ * Implements hook_field_formatter_info().
+ */
+function funding_field_formatter_info() {
+  return array(
+    'funding_opencollective_donate_button' => array(
+      'label' => t('Funding: OpenCollective Donate Button'),
+      'field types' => array('link'),
+    ),
+
+    'funding_opencollective_backers' => array(
+      'label' => t('Funding: OpenCollective Backers & Sponsors'),
+      'field types' => array('link'),
+    ),
+
+    'funding_opencollective_events' => array(
+      'label' => t('Funding: OpenCollective Events'),
+      'field types' => array('link'),
+    ),
+
+    'funding_opencollective_website_badge' => array(
+      'label' => t('Funding: OpenCollective Website Badge'),
+      'field types' => array('link'),
+    ),
+
+    'funding_opencollective_tier_badge' => array(
+      'label' => t('Funding: OpenCollective SVG Tier Badge'),
+      'field types' => array('link'),
+    ),
+
+    'funding_opencollective_contributors_widget' => array(
+      'label' => t('Funding: OpenCollective SVG Contributors Widget'),
+      'field types' => array('link'),
+    ),
+
+    'funding_opencollective_all_contributors_badge' => array(
+      'label' => t('Funding: OpenCollective SVG All Contributors Badge'),
+      'field types' => array('link'),
+    ),
+  );
+}
+
+/**
+ * Implements hook_field_formatter_view().
+ */
+function funding_field_formatter_view($entity_type, $entity, $field, $instance, $langcode, $items, $display) {
+  $element = array();
+
+  $collective_slug = 'portland-drupal';
+  $collective_url = 'https://opencollective.com/' . $collective_slug;
+
+  switch ($display['type']) {
+    // Dynamic image reading "donate" or "contribute".
+    // The verb can either be "donate" or "contribute".
+    // Color can be "white" or "blue".
+    case 'funding_opencollective_donate_button':
+      $verb = 'donate';
+      $color = 'white';
+      foreach ($items as $delta => $item) {
+        $element[$delta] = array(
+          '#type' => 'html_tag',
+          '#tag' => 'a',
+          '#attributes' => array(
+            'href' => $item['href'],
+            'src' => $collective_url . '/' . $verb . '/button.js',
+            'target' => '_blank',
+          ),
+          'children' => array(
+            array(
+              '#type' => 'html_tag',
+              '#tag' => 'img',
+              '#attributes' => array(
+                'src' => $collective_url . '/' . $verb . '/button@2x.png?color=' . $color,
+                'width' => '300',
+              ),
+            ),
+          ),
+        );
+      }
+      break;
+
+    // This formatter simply outputs the field as text and with a color.
+    case 'funding_opencollective_backers':
+      foreach ($items as $delta => $item) {
+        $element[$delta] = array(
+          '#type' => 'html_tag',
+          '#tag' => 'script',
+          '#attributes' => array(
+            'src' => $collective_url . '/banner.js',
+          ),
+        );
+      }
+      break;
+
+    // This formatter simply outputs the field as text and with a color.
+    case 'funding_opencollective_events':
+      foreach ($items as $delta => $item) {
+        $element[$delta] = array(
+          // We create a render array to produce the desired markup,
+          // "<p style="color: #hexcolor">The color code ... #hexcolor</p>".
+          // See theme_html_tag().
+          '#type' => 'html_tag',
+          '#tag' => 'script',
+          '#attributes' => array(
+            'src' => $collective_url . '/events.js',
+            'width' => '500',
+          ),
+        );
+      }
+      break;
+
+    // Values for role:
+    // - backer, admin (core contributor), member (contributor) or host.
+    // Leave it empty or remove it to show all the collectives that you are a member of, irrespective of the role.
+    case 'funding_opencollective_website_badge':
+      $user = 'liberatr';
+      $role = 'backer';
+      foreach ($items as $delta => $item) {
+        $element[$delta] = array(
+          // We create a render array to produce the desired markup,
+          // "<p style="color: #hexcolor">The color code ... #hexcolor</p>".
+          // See theme_html_tag().
+          '#type' => 'html_tag',
+          '#tag' => 'script',
+          '#attributes' => array(
+            'src' => 'https://opencollective.com/' . $user . '/collectives.js?role=' . $role,
+          ),
+        );
+      }
+      break;
+
+    // Outputs a dynamic SVG with given label and a numeric value.
+    // Color of the badge:
+    // - brightgreen, green, yellowgreen, yellow, orange, red, lightgrey, blue.
+    case 'funding_opencollective_tier_badge':
+      $color = 'brightgreen';
+      $tier = 'supporter';
+      $label = isset($label) ? $tier : 'supporter';
+      foreach ($items as $delta => $item) {
+        $element[$delta] = array(
+          '#type' => 'html_tag',
+          '#tag' => 'img',
+          '#attributes' => array(
+            'src' => $collective_url . '/tiers/' . $tier . '/badge.svg?label=' . $label . '&color=' . $color,
+          ),
+        );
+      }
+      break;
+
+    // Outputs a dynamic SVG object of user avatars and a Contribute button.
+    case 'funding_opencollective_contributors_widget':
+      $avatar_height = 36;
+      $width = 600;
+      foreach ($items as $delta => $item) {
+        $element[$delta] = array(
+          '#type' => 'html_tag',
+          '#tag' => 'object',
+          '#attributes' => array(
+            'type' => "image/svg+xml",
+            'data' => $collective_url . '/tiers/supporter.svg?avatarHeight=' . $avatar_height . '&width=' . $width,
+          ),
+        );
+      }
+      break;
+
+    // Outputs a dynamic SVG reading "financial contributors" and a numeric value.
+    case 'funding_opencollective_all_contributors_badge':
+      foreach ($items as $delta => $item) {
+        $element[$delta] = array(
+          '#type' => 'html_tag',
+          '#tag' => 'img',
+          '#attributes' => array(
+            'src' => $collective_url . '/tiers/badge.svg',
+          ),
+        );
+      }
+      break;
+  }
+
+  return $element;
+}
