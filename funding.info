@@ -1,5 +1,5 @@
 name = Funding
 description = Post Crowdfunding links and widgets for OpenCollective and similar platforms.
+dependencies[] = composer_manager:composer_manager
 core = 7.x
-package = Fields
-dependencies[] = link:link
+
