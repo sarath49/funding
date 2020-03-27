@@ -1,19 +1,76 @@
 <?php
-use Symfony\Component\Yaml\Yaml;
 
 /**
  * @file
- * Provide long text formatters and widgets for OpenCollective and similar platforms.
- *
+ * Provide funding field, yaml formatters and widgets for crowdfunding.
  */
+
+use Symfony\Component\Yaml\Yaml;
+use Symfony\Component\Yaml\Exception\ParseException;
+
 /**
  * Implements hook_help().
  */
 function funding_help($path, $arg) {
   switch ($path) {
     case 'admin/help#funding':
-      return t("Provide link formatters and widgets for OpenCollective and similar platforms.");
+      return t("Provide a funding YAML field, formatters and widgets for OpenCollective, Patreon and similar platforms.");
   }
+}
+
+/**
+ * Implements hook_field_info().
+ *
+ * Provides the description of the funding field.
+ */
+function funding_field_info() {
+  return array(
+    'funding' => array(
+      'label' => t('Funding YAML'),
+      'description' => t('Accepts YAML describing crowdfunding accounts.'),
+      'default_widget' => 'funding',
+      'default_formatter' => 'funding_text',
+    ),
+  );
+}
+
+/**
+ * Implements hook_field_validate().
+ */
+function funding_field_validate($entity_type, $entity, $field, $instance, $langcode, $items, &$errors) {
+  foreach ($items as $delta => $item) {
+    $message = '';
+    if (!empty($item['funding'])) {
+      try {
+        $items = Yaml::parse($item['value']);
+        foreach ($items as $provider => $username) {
+          if (is_array($username) && !isset($username['slug'])) {
+            $message = t('No "slug:" provided for array: %provider', ['%provider', $provider]);
+          }
+          elseif (empty($username)) {
+            $message = t('No username provided for provider: %provider', ['%provider', $provider]);;
+          }
+        }
+      }
+      catch (ParseException $e) {
+        $message = t('Unable to parse the YAML string: %message', ['%message', $e->getMessage()]);
+      }
+    }
+
+    if ($message) {
+      $errors[$field['field_name']][$langcode][$delta][] = array(
+        'error' => 'funding_invalid',
+        'message' => $message,
+      );
+    }
+  }
+}
+
+/**
+ * Implements hook_field_is_empty().
+ */
+function funding_field_is_empty($item, $field) {
+  return empty($item['funding']);
 }
 
 /**
@@ -21,19 +78,25 @@ function funding_help($path, $arg) {
  */
 function funding_field_formatter_info() {
   return array(
-    'funding_providers' => array(
-      'label' => t('Render the funding providers'),
+    'funding_text' => array(
+      'label' => t('Funding text box'),
       'field types' => array(
-        'text_long'
-      )
-    )
+        'funding',
+      ),
+    ),
+    'funding_providers' => array(
+      'label' => t('Funding buttons'),
+      'field types' => array(
+        'funding',
+      ),
+    ),
   );
 }
 
 /**
  * Implements hook_field_formatter_view().
- * 
- * Eg.
+ *
+ * e.g.
  * opencollective-js:
  *   slug: portland-drupal
  *   verb: donate
@@ -47,34 +110,136 @@ function funding_field_formatter_view($entity_type, $entity, $field, $instance, 
   $element = [];
   $settings = $display['settings'];
 
-  $funding_yaml = $items[0]['value'];
-  if (!empty($funding_yaml)) {
-    $funding_config = Yaml::parse($funding_yaml);
-    //drupal_set_message(print_r($funding_config, true), 'error');
-    foreach ($funding_config as $provider => $config){
-      switch ($provider) {
-        case 'opencollective-js':
-          $slug = $config['slug'];
-          $verb = $config['verb'];
-          $color = $config['color'];
-          $element[0][$provider] = ['#type' => 'markup', '#markup' => '<script src="https://opencollective.com/' . $slug . '/' . $verb . '/button.js" color="' . $color . '"></script>',
-          '#allowed_tags' => ['script',], ];
-          break;
-        case 'opencollective-img':
-          $slug = $config['slug'];
-          $verb = $config['verb'];
-          $color = $config['color'];
-          $element[0][$provider] = ['#type' => 'markup', '#markup' => '<a href="https://opencollective.com/' . $slug . '/' . $verb . '" target="_blank"> <img src="https://opencollective.com/' . $slug . '/' . $verb . '/button@2x.png?color=' . $color . '" width=300 /></a>',
-          '#allowed_tags' => ['img','a', ], ];
-          break;
-        case 'twitter-timeline':
-          $handle = $config['handle'];
-          $element[0][$provider] = ['#type' => 'markup', '#markup' => '<a class="twitter-timeline" href="https://twitter.com/' . $handle . '?ref_src=twsrc%5Etfw">Tweets by drupalassoc</a> <script async src="https://platform.twitter.com/widgets.js" charset="utf-8"></script>',
-          '#allowed_tags' => ['script','a', ], ];
-          break;
+  switch ($display['type']) {
+    case 'funding_text':
+      foreach ($items as $delta => $item) {
+        $element[$delta] = funding_view_text(Yaml::parse($item['value']));
       }
+      break;
+
+    case 'funding_providers':
+      foreach ($items as $delta => $item) {
+        $element[$delta] = funding_view_providers(Yaml::parse($item['value']));
+      }
+      break;
+  }
+
+  return $element;
+}
+
+/**
+ * Render a text block with all funding links.
+ *
+ * @param array $funding_config
+ *   Associative array of funding providers and usernames.
+ *
+ * @return array
+ *   Render array.
+ */
+function funding_view_text(array $funding_config) {
+
+  $links = [];
+  foreach ($funding_config as $provider => $username) {
+    if (is_array($username) && isset($username['slug'])) {
+      $slug = $username['slug'];
+    }
+    else {
+      $slug = check_plain($slug);
+    }
+
+    switch ($provider) {
+      case 'open_collective':
+        $links[] = '<a href="https://opencollective.com/' . $slug . '" target="_blank">OpenCollective</a>';
+        break;
+
+      case 'patreon':
+        $links[] = '<a href="https://patreon.com/' . $slug . '" target="_blank">Patreon</a>';
+        break;
+
+      case 'github':
+        $links[] = '<a href="https://github.com/sponsors/' . $slug . '" target="_blank">Patreon</a>';
+        break;
+
+      case 'custom':
+        $links[] = '<a href="' . $slug . '">' . $slug . '</a>';
+        break;
     }
   }
-  
-return $element;
+
+  // Create a plural format that can be translated.
+  $last_link = array_pop($links);
+  if (empty($links)) {
+    $markup = t("This project is supported by a community of contributors. Visit their page on %link to learn more.", ['%link' => $last_link]);
+  }
+  else {
+    $markup = t("This project is supported by a community of contributors. Visit their page on %links or %last_link to learn more.", [
+      '%links' => implode(', ', $links),
+      '%last_link' => $last_link,
+    ]);
+  }
+
+  return [
+    '#type' => 'markup',
+    '#markup' => $markup,
+    '#allowed_tags' => ['a'],
+  ];
+}
+
+/**
+ * Render widgets for all funding links.
+ *
+ * @param array $funding_config
+ *   Associative array of funding providers and usernames.
+ *
+ * @return array
+ *   Render array.
+ */
+function funding_view_providers(array $funding_config) {
+  $element = [];
+  foreach ($funding_config as $provider => $config) {
+    switch ($provider) {
+      case 'open_collective-js':
+        $slug = $config['slug'];
+        $verb = $config['verb'];
+        $color = $config['color'];
+        $element[$provider] = [
+          '#type' => 'markup',
+          '#markup' => '<script src="https://opencollective.com/' . $slug . '/' . $verb . '/button.js" color="' . $color . '"></script>',
+          '#allowed_tags' => ['script'],
+        ];
+        break;
+
+      case 'open_collective-img':
+        $slug = $config['slug'];
+        $verb = $config['verb'];
+        $color = $config['color'];
+        $element[$provider] = [
+          '#type' => 'markup',
+          '#markup' => '<a href="https://opencollective.com/' . $slug . '/' . $verb . '" target="_blank"> <img src="https://opencollective.com/' . $slug . '/' . $verb . '/button@2x.png?color=' . $color . '" width=300 /></a>',
+          '#allowed_tags' => ['img', 'a'],
+        ];
+        break;
+
+      case 'twitter-timeline':
+        $handle = $config['handle'];
+        $element[$provider] = [
+          '#type' => 'markup',
+          '#markup' => '<a class="twitter-timeline" href="https://twitter.com/' . $handle . '?ref_src=twsrc%5Etfw">Tweets by drupalassoc</a> <script async src="https://platform.twitter.com/widgets.js" charset="utf-8"></script>',
+          '#allowed_tags' => ['script', 'a'],
+        ];
+        break;
+    }
+  }
+  return $element;
+}
+
+/**
+ * Implements hook_field_widget_error().
+ */
+function fudning_field_widget_error($element, $error, $form, &$form_state) {
+  switch ($error['error']) {
+    case 'fudning_invalid':
+      form_error($element, $error['message']);
+      break;
+  }
 }
