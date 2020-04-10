@@ -109,7 +109,7 @@ function funding_field_formatter_info() {
  * open_collective-img:
  *   slug: portland-drupal
  *   verb: contribute
- *   color: white.
+ *   color: white
  */
 function funding_field_formatter_view($entity_type, $entity, $field, $instance, $langcode, $items, $display) {
   $element = [];
@@ -147,26 +147,28 @@ function funding_view_text(array $funding_config) {
   foreach ($funding_config as $provider => $username) {
     if (is_array($username) && isset($username['slug'])) {
       $slug = $username['slug'];
+
     }
     else {
-      $slug = check_plain($slug);
+      $slug = check_plain($username);
     }
+    $slug_clean = check_plain($slug);
 
     switch ($provider) {
       case 'open_collective':
-        $links[] = '<a href="https://opencollective.com/' . $slug . '" target="_blank">OpenCollective</a>';
+        $links[] = '<a href="https://opencollective.com/' . $slug_clean . '" target="_blank">OpenCollective</a>';
         break;
 
       case 'patreon':
-        $links[] = '<a href="https://patreon.com/' . $slug . '" target="_blank">Patreon</a>';
+        $links[] = '<a href="https://patreon.com/' . $slug_clean . '" target="_blank">Patreon</a>';
         break;
 
       case 'github':
-        $links[] = '<a href="https://github.com/sponsors/' . $slug . '" target="_blank">Patreon</a>';
+        $links[] = '<a href="https://github.com/sponsors/' . $slug_clean . '" target="_blank">Github</a>';
         break;
 
       case 'custom':
-        $links[] = '<a href="' . $slug . '">' . $slug . '</a>';
+        $links[] = '<a href="' . filter_xss($slug) . '">' . parse_url($slug, PHP_URL_HOST) . parse_url($slug, PHP_URL_PATH) . '</a>';
         break;
     }
   }
