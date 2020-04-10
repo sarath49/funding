@@ -234,11 +234,47 @@ function funding_view_providers(array $funding_config) {
 }
 
 /**
+ * Implements hook_field_widget_info().
+ */
+function funding_field_widget_info() {
+  return array(
+    'funding' => array(
+      'label' => t('Funding YAML'),
+      'field types' => array('funding'),
+    ),
+  );
+}
+
+/**
+ * Implements hook_field_widget_form().
+ */
+function funding_field_widget_form(&$form, &$form_state, $field, $instance, $langcode, $items, $delta, $element) {
+  $value = isset($items[$delta]['value']) ? $items[$delta]['value'] : NULL;
+
+  $widget = $element;
+  $widget['#delta'] = $delta;
+
+  switch ($instance['widget']['type']) {
+    case 'funding':
+      $widget += array(
+        '#type' => 'textarea',
+        '#default_value' => $value,
+        '#rows' => $instance['widget']['settings']['rows'],
+        '#attributes' => array('class' => array('text-funding-yaml')),
+      );
+      break;
+  }
+
+  $element['funding'] = $widget;
+  return $element;
+}
+
+/**
  * Implements hook_field_widget_error().
  */
-function fudning_field_widget_error($element, $error, $form, &$form_state) {
+function funding_field_widget_error($element, $error, $form, &$form_state) {
   switch ($error['error']) {
-    case 'fudning_invalid':
+    case 'funding_invalid':
       form_error($element, $error['message']);
       break;
   }
