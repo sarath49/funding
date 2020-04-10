@@ -9,13 +9,13 @@
  * Implements field_example_field_schema().
  */
 function funding_field_schema() {
-  return array(
-    'columns' => array(
-      'funding_value' => array(
+  return [
+    'columns' => [
+      'value' => [
         'type' => 'text',
         'size' => 'big',
         'not null' => FALSE,
-      ),
-    ),
-  );
+      ],
+    ],
+  ];
 }

@@ -24,14 +24,14 @@ function funding_help($path, $arg) {
  * Provides the description of the funding field.
  */
 function funding_field_info() {
-  return array(
-    'funding' => array(
+  return [
+    'funding' => [
       'label' => t('Funding YAML'),
       'description' => t('Accepts YAML describing crowdfunding accounts.'),
       'default_widget' => 'funding',
       'default_formatter' => 'funding_text',
-    ),
-  );
+    ],
+  ];
 }
 
 /**
@@ -40,16 +40,21 @@ function funding_field_info() {
 function funding_field_validate($entity_type, $entity, $field, $instance, $langcode, $items, &$errors) {
   foreach ($items as $delta => $item) {
     $message = '';
-    if (!empty($item['funding'])) {
+    if (!empty($item['value'])) {
       try {
         $items = Yaml::parse($item['value']);
-        foreach ($items as $provider => $username) {
-          if (is_array($username) && !isset($username['slug'])) {
-            $message = t('No "slug:" provided for array: %provider', ['%provider', $provider]);
+        if (is_array($items)) {
+          foreach ($items as $provider => $username) {
+            if (is_array($username) && !isset($username['slug'])) {
+              $message = t('No "slug:" provided for array: %provider', ['%provider', $provider]);
+            }
+            elseif (empty($username)) {
+              $message = t('No username provided for provider: %provider', ['%provider', $provider]);;
+            }
           }
-          elseif (empty($username)) {
-            $message = t('No username provided for provider: %provider', ['%provider', $provider]);;
-          }
+        }
+        else {
+          $message = t('Unable to parse the YAML array. Please check the format and try again.');
         }
       }
       catch (ParseException $e) {
@@ -58,10 +63,10 @@ function funding_field_validate($entity_type, $entity, $field, $instance, $langc
     }
 
     if ($message) {
-      $errors[$field['field_name']][$langcode][$delta][] = array(
+      $errors[$field['field_name']][$langcode][$delta][] = [
         'error' => 'funding_invalid',
         'message' => $message,
-      );
+      ];
     }
   }
 }
@@ -70,41 +75,41 @@ function funding_field_validate($entity_type, $entity, $field, $instance, $langc
  * Implements hook_field_is_empty().
  */
 function funding_field_is_empty($item, $field) {
-  return empty($item['funding']);
+  return empty($item['value']);
 }
 
 /**
  * Implements hook_field_formatter_info().
  */
 function funding_field_formatter_info() {
-  return array(
-    'funding_text' => array(
+  return [
+    'funding_text' => [
       'label' => t('Funding text box'),
-      'field types' => array(
+      'field types' => [
         'funding',
-      ),
-    ),
-    'funding_providers' => array(
+      ],
+    ],
+    'funding_providers' => [
       'label' => t('Funding buttons'),
-      'field types' => array(
+      'field types' => [
         'funding',
-      ),
-    ),
-  );
+      ],
+    ],
+  ];
 }
 
 /**
  * Implements hook_field_formatter_view().
  *
  * e.g.
- * opencollective-js:
+ * open_collective-js:
  *   slug: portland-drupal
  *   verb: donate
  *   color: blue
- * opencollective-img:
+ * open_collective-img:
  *   slug: portland-drupal
  *   verb: contribute
- *   color: white
+ *   color: white.
  */
 function funding_field_formatter_view($entity_type, $entity, $field, $instance, $langcode, $items, $display) {
   $element = [];
@@ -166,15 +171,19 @@ function funding_view_text(array $funding_config) {
     }
   }
 
+  if (empty($links)) {
+    return [];
+  }
+
   // Create a plural format that can be translated.
   $last_link = array_pop($links);
   if (empty($links)) {
-    $markup = t("This project is supported by a community of contributors. Visit their page on %link to learn more.", ['%link' => $last_link]);
+    $markup = t("This project is supported by a community of contributors. Visit their page on !link to learn more.", ['!link' => $last_link]);
   }
   else {
-    $markup = t("This project is supported by a community of contributors. Visit their page on %links or %last_link to learn more.", [
-      '%links' => implode(', ', $links),
-      '%last_link' => $last_link,
+    $markup = t("This project is supported by a community of contributors. Visit their page on !links or !last_link to learn more.", [
+      '!links' => implode(', ', $links),
+      '!last_link' => $last_link,
     ]);
   }
 
@@ -237,12 +246,12 @@ function funding_view_providers(array $funding_config) {
  * Implements hook_field_widget_info().
  */
 function funding_field_widget_info() {
-  return array(
-    'funding' => array(
+  return [
+    'funding' => [
       'label' => t('Funding YAML'),
-      'field types' => array('funding'),
-    ),
-  );
+      'field types' => ['funding'],
+    ],
+  ];
 }
 
 /**
@@ -256,16 +265,16 @@ function funding_field_widget_form(&$form, &$form_state, $field, $instance, $lan
 
   switch ($instance['widget']['type']) {
     case 'funding':
-      $widget += array(
+      $widget += [
         '#type' => 'textarea',
         '#default_value' => $value,
-        '#rows' => $instance['widget']['settings']['rows'],
-        '#attributes' => array('class' => array('text-funding-yaml')),
-      );
+        '#rows' => 5,
+        '#attributes' => ['class' => ['text-funding-yaml']],
+      ];
       break;
   }
 
-  $element['funding'] = $widget;
+  $element['value'] = $widget;
   return $element;
 }
 
