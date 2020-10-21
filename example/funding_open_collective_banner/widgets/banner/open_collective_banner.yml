@@ -1,0 +1,6 @@
+open_collective_banner:
+  name: 'Open Collective Backers & Sponsers'
+  form:
+    slug: ''
+  theme:
+    name: funding_provider_open_collective_banner

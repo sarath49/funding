@@ -1,0 +1,4 @@
+name = Funding Open Collective Banner
+description = Funding Open Collective Banner
+dependencies[] = funding:funding
+core = 7.x

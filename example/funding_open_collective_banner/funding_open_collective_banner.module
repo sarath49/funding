@@ -1,0 +1,38 @@
+<?php
+/**
+ * @file
+ * Provide funding field, yaml formatters and widgets for showing backers.
+ */
+
+use Symfony\Component\Yaml\Yaml;
+use Symfony\Component\Yaml\Exception\ParseException;
+
+/**
+ * Implements hook_funding_providers_widgets()
+ */
+function funding_open_collective_banner_funding_providers_widgets() {
+    $widgets = [];
+
+    $widgets_directory = drupal_get_path('module', 'funding_open_collective_banner') . '/widgets/banner';
+    $files = file_scan_directory($widgets_directory, '/\.yml$/');
+    foreach ($files as $file) {
+      $file_content = file_get_contents($file->uri);
+      $file_content = Yaml::parse($file_content);
+      $widgets[$file->name] = $file_content[$file->name];
+    }
+
+    return $widgets;
+}
+
+/**
+ * Implements hook_theme().
+ */
+function funding_open_collective_banner_theme() {
+  return [
+    'funding_provider_open_collective_banner' => [
+      'render element' => 'element',
+      'path' => drupal_get_path('module', 'funding_open_collective_banner') . '/templates',
+      'template' => 'funding-provider-open-collective-banner',
+      ],
+  ];
+}
