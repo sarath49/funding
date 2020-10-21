@@ -1,0 +1,8 @@
+open_collective_js:
+  name: 'Open Collective Js'
+  form:
+    slug: ''
+    verb: ''
+    color: ''
+  theme:
+    name: funding_provider_open_collective_js

@@ -1,0 +1,6 @@
+open_collective:
+  name: 'Open Collective'
+  form:
+    open_collective: ''
+  theme:
+    name: funding_text_open_collective

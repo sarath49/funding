@@ -88,12 +88,18 @@ function funding_field_formatter_info() {
       'field types' => [
         'funding',
       ],
+      'settings' => [
+        'widget' => array('funding_text_widgets' => NULL),
+      ]
     ],
     'funding_providers' => [
       'label' => t('Funding buttons'),
       'field types' => [
         'funding',
       ],
+      'settings' => [
+        'widget' => array('funding_providers_widgets' => NULL),
+      ]
     ],
   ];
 }
@@ -144,33 +150,10 @@ function funding_field_formatter_view($entity_type, $entity, $field, $instance, 
 function funding_view_text(array $funding_config) {
 
   $links = [];
-  foreach ($funding_config as $provider => $username) {
-    if (is_array($username) && isset($username['slug'])) {
-      $slug = $username['slug'];
-
-    }
-    else {
-      $slug = check_plain($username);
-    }
-    $slug_clean = check_plain($slug);
-
-    switch ($provider) {
-      case 'open_collective':
-        $links[] = '<a href="https://opencollective.com/' . $slug_clean . '" target="_blank">OpenCollective</a>';
-        break;
-
-      case 'patreon':
-        $links[] = '<a href="https://patreon.com/' . $slug_clean . '" target="_blank">Patreon</a>';
-        break;
-
-      case 'github':
-        $links[] = '<a href="https://github.com/sponsors/' . $slug_clean . '" target="_blank">Github</a>';
-        break;
-
-      case 'custom':
-        $links[] = '<a href="' . filter_xss($slug) . '">' . parse_url($slug, PHP_URL_HOST) . parse_url($slug, PHP_URL_PATH) . '</a>';
-        break;
-    }
+  $widgets = module_invoke_all('funding_text_widgets');
+  foreach ($funding_config as $provider => $config) {
+    $theme = theme($widgets[$provider]['theme']['name'], ['config' => $config]);
+    $links[] = theme($widgets[$provider]['theme']['name'], ['config' => $config]);
   }
 
   if (empty($links)) {
@@ -207,39 +190,12 @@ function funding_view_text(array $funding_config) {
  */
 function funding_view_providers(array $funding_config) {
   $element = [];
+  $widgets = module_invoke_all('funding_providers_widgets');
   foreach ($funding_config as $provider => $config) {
-    switch ($provider) {
-      case 'open_collective-js':
-        $slug = $config['slug'];
-        $verb = $config['verb'];
-        $color = $config['color'];
-        $element[$provider] = [
-          '#type' => 'markup',
-          '#markup' => '<script src="https://opencollective.com/' . $slug . '/' . $verb . '/button.js" color="' . $color . '"></script>',
-          '#allowed_tags' => ['script'],
-        ];
-        break;
-
-      case 'open_collective-img':
-        $slug = $config['slug'];
-        $verb = $config['verb'];
-        $color = $config['color'];
-        $element[$provider] = [
-          '#type' => 'markup',
-          '#markup' => '<a href="https://opencollective.com/' . $slug . '/' . $verb . '" target="_blank"> <img src="https://opencollective.com/' . $slug . '/' . $verb . '/button@2x.png?color=' . $color . '" width=300 /></a>',
-          '#allowed_tags' => ['img', 'a'],
-        ];
-        break;
-
-      case 'twitter-timeline':
-        $handle = $config['handle'];
-        $element[$provider] = [
-          '#type' => 'markup',
-          '#markup' => '<a class="twitter-timeline" href="https://twitter.com/' . $handle . '?ref_src=twsrc%5Etfw">Tweets by drupalassoc</a> <script async src="https://platform.twitter.com/widgets.js" charset="utf-8"></script>',
-          '#allowed_tags' => ['script', 'a'],
-        ];
-        break;
-    }
+    $element[$provider] = [
+      '#theme' => $widgets[$provider]['theme']['name'],
+      'config' => $config
+    ];
   }
   return $element;
 }
@@ -267,9 +223,38 @@ function funding_field_widget_form(&$form, &$form_state, $field, $instance, $lan
 
   switch ($instance['widget']['type']) {
     case 'funding':
+      $widget_type = $instance['display']['default']['type'];
+      $widget_selected = [];
+      if (isset($instance['display']['default']['settings']['widget']["{$widget_type}_widgets"])) {
+        $widget_selected = $instance['display']['default']['settings']['widget']["{$widget_type}_widgets"];
+      }
+      $value = Yaml::parse($value);
+      $widgets = module_invoke_all("{$widget_type}_widgets");
+      $updated_value = [];
+      if ($widget_type === "funding_providers") {
+        foreach($widget_selected as $widget_value) {
+          if(isset($widgets[$widget_value]) && isset($value[$widget_value])) {
+            $updated_value[$widget_value] = $value[$widget_value];
+          }
+          else if ($widget_value !== 0) {
+            $updated_value[$widget_value] = $widgets[$widget_value]['form'];
+          }
+        }
+      }
+      if ($widget_type === "funding_text") {
+        foreach($widget_selected as $widget_value) {
+          if(isset($widgets[$widget_value]) && isset($value[$widget_value])) {
+            $updated_value[$widget_value] = $value[$widget_value];
+          }
+          else if ($widget_value !== 0) {
+            $updated_value[$widget_value] = $widgets[$widget_value]['form'][$widget_value];
+          }
+        }
+      }
+
       $widget += [
         '#type' => 'textarea',
-        '#default_value' => $value,
+        '#default_value' => !empty($updated_value) ? Yaml::dump($updated_value) : '',
         '#rows' => 5,
         '#attributes' => ['class' => ['text-funding-yaml']],
       ];
@@ -289,4 +274,212 @@ function funding_field_widget_error($element, $error, $form, &$form_state) {
       form_error($element, $error['message']);
       break;
   }
+}
+
+/**
+ * Implements hook_field_formatter_settings_summary().
+ */
+function funding_field_formatter_settings_summary($field, $instance, $view_mode) {
+  $display = $instance['display'][$view_mode];
+  $settings = $display['settings'];
+  $summary = '';
+
+  if ($display['type'] === 'funding_providers') {
+    $widgets = module_invoke_all('funding_providers_widgets');
+    $widget_selected = [];
+    foreach($settings['widget']['funding_providers_widgets'] as $widget_key) {
+      if (isset($widgets[$widget_key])) {
+        $widget_selected[] = $widgets[$widget_key]['name'];
+      }
+    }
+    $summary = t('Funding Buttons: @selected', ['@selected' => implode($widget_selected, ', ')]);
+  }
+
+  if ($display['type'] === 'funding_text') { 
+    $widgets = module_invoke_all('funding_text_widgets');
+    $widget_selected = [];
+    foreach($settings['widget']['funding_text_widgets'] as $widget_key) {
+      if (isset($widgets[$widget_key])) {
+        $widget_selected[] = $widgets[$widget_key]['name'];
+      }
+    }
+    $summary = t('Funding Text: @selected', ['@selected' => implode($widget_selected, ', ')]);
+  }
+
+  return $summary;
+}
+
+/**
+ * Implements hook_field_formatter_settings_form().
+ */
+function funding_field_formatter_settings_form($field, $instance, $view_mode, $form, &$form_state) {
+  $display = $instance['display'][$view_mode];
+  $settings = $display['settings'];
+  $element = [];
+  
+  // Funding Buttons.
+  if ($display['type'] === 'funding_providers') {
+    $widgets = module_invoke_all('funding_providers_widgets');
+    $element['widget'] = array(
+      '#tree' => TRUE,
+      '#type' => 'fieldset',
+      '#title' => t('Funding Button options'),
+      '#description' => t('Choose funding button options.'),
+      '#weight' => -2,
+      '#collapsible' => TRUE,
+      '#collapsed' => FALSE,
+    );
+    $widget_elements = [];
+    foreach($widgets as $widget_key => $widget_value) {
+      $widget_elements[$widget_key] = $widget_value['name'];
+    }
+
+    $element['widget']['funding_providers_widgets'] = [
+      '#type' => 'checkboxes',
+      '#options' => $widget_elements,
+      '#default_value' => isset($settings['widget']['funding_providers_widgets']) ? array_values($settings['widget']['funding_providers_widgets']) : [],
+      '#attributes' => array('class' => array('funding-providers-widgets', 'clearfix')),
+      '#required' => TRUE,
+    ];
+  }
+
+  // Funding Text.
+  if ($display['type'] === 'funding_text') {
+    $widgets = module_invoke_all('funding_text_widgets');
+    $element['widget'] = array(
+      '#tree' => TRUE,
+      '#type' => 'fieldset',
+      '#title' => t('Funding Text options'),
+      '#description' => t('Choose funding text options.'),
+      '#weight' => -2,
+      '#collapsible' => TRUE,
+      '#collapsed' => FALSE,
+    );
+    $widget_elements = [];
+    foreach($widgets as $widget_key => $widget_value) {
+      $widget_elements[$widget_key] = $widget_value['name'];
+    }
+
+    $element['widget']['funding_text_widgets'] = [
+      '#type' => 'checkboxes',
+      '#options' => $widget_elements,
+      '#default_value' => isset($settings['widget']['funding_text_widgets']) ? array_values($settings['widget']['funding_text_widgets']) : [],
+      '#attributes' => array('class' => array('funding-text-widgets', 'clearfix')),
+      '#required' => TRUE,
+    ];
+  }
+
+  return $element;
+}
+
+/**
+ * Implements hook_funding_providers_widgets().
+ *
+ * This hook allows other modules to create additional custom widgets for
+ * the fivestar module.
+ *
+ * @return array
+ *   An array of key => value pairs suitable for inclusion as the #options in a
+ *   select or radios form element. Each key must be the location of a css
+ *   file for a fivestar widget. Each value should be the name of the widget.
+ */
+function funding_funding_providers_widgets() {
+  $widgets = &drupal_static(__FUNCTION__);
+  if (!isset($widgets)) {
+    $cache = cache_get(__FUNCTION__);
+    if ($cache) {
+      $widgets = $cache->data;
+    }
+  }
+
+  if (!isset($widgets)) {
+    $widgets_directory = drupal_get_path('module', 'funding') . '/widgets/buttons';
+    $files = file_scan_directory($widgets_directory, '/\.yml$/');
+    foreach ($files as $file) {
+      $file_content = file_get_contents($file->uri);
+      $file_content = Yaml::parse($file_content);
+      $widgets[$file->name] = $file_content[$file->name];
+    }
+    cache_set(__FUNCTION__, $widgets);
+  }
+  return $widgets;
+}
+
+/**
+ * Implements hook_funding_providers_widgets().
+ *
+ * This hook allows other modules to create additional custom widgets for
+ * the fivestar module.
+ *
+ * @return array
+ *   An array of key => value pairs suitable for inclusion as the #options in a
+ *   select or radios form element. Each key must be the location of a css
+ *   file for a fivestar widget. Each value should be the name of the widget.
+ */
+function funding_funding_text_widgets() {
+  $widgets = &drupal_static(__FUNCTION__);
+  if (!isset($widgets)) {
+    $cache = cache_get(__FUNCTION__);
+    if ($cache) {
+      $widgets = $cache->data;
+    }
+  }
+
+  if (!isset($widgets)) {
+    $widgets_directory = drupal_get_path('module', 'funding') . '/widgets/text';
+    $files = file_scan_directory($widgets_directory, '/\.yml$/');
+    foreach ($files as $file) {
+      $file_content = file_get_contents($file->uri);
+      $file_content = Yaml::parse($file_content);
+      $widgets[$file->name] = $file_content[$file->name];
+    }
+    cache_set(__FUNCTION__, $widgets);
+  }
+  return $widgets;
+}
+
+/**
+ * Implements hook_theme().
+ */
+function funding_theme() {
+  return [
+    'funding_provider_open_collective_img' => [
+      'render element' => 'element',
+      'path' => drupal_get_path('module', 'funding') . '/templates',
+      'template' => 'funding-provider-open-collective-img',
+    ],
+    'funding_provider_open_collective_js' => [
+      'render element' => 'element',
+      'path' => drupal_get_path('module', 'funding') . '/templates',
+      'template' => 'funding-provider-open-collective-js',
+    ],
+    'funding_text_github' => [
+      'variables' => [
+        'config' => NULL
+      ],
+      'path' => drupal_get_path('module', 'funding') . '/templates',
+      'template' => 'funding-text-github',
+    ],
+    'funding_text_open_collective' => [
+      'variables' => [
+        'config' => NULL
+      ],
+      'path' => drupal_get_path('module', 'funding') . '/templates',
+      'template' => 'funding-text-open-collective',
+    ],
+    'funding_text_patreon' => [
+      'variables' => [
+        'config' => NULL
+      ],
+      'path' => drupal_get_path('module', 'funding') . '/templates',
+      'template' => 'funding-text-patreon',
+    ],
+    'funding_text_custom' => [
+      'variables' => [
+        'config' => NULL
+      ],
+      'path' => drupal_get_path('module', 'funding') . '/templates',
+      'template' => 'funding-text-custom',
+    ],
+  ];
 }

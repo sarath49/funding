@@ -1,0 +1,6 @@
+patreon:
+  name: 'Patreon'
+  form:
+    patreon: ''
+  theme:
+    name: funding_text_patreon

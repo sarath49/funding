@@ -1,0 +1,1 @@
+<a href="https://patreon.com/<?php print check_plain($config) ?>" target="_blank">Patreon</a>

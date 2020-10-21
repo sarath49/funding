@@ -1,0 +1,6 @@
+github:
+  name: 'Github'
+  form:
+    github: ''
+  theme:
+    name: funding_text_github

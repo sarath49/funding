@@ -1,0 +1,8 @@
+custom:
+  name: 'Custom'
+  form:
+    custom:
+      slug: ''
+      name: ''
+  theme:
+    name: funding_text_custom

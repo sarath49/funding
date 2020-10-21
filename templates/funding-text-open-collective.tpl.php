@@ -1,0 +1,1 @@
+<a href="https://opencollective.com/<?php print check_plain($config) ?>" target="_blank">OpenCollective</a>

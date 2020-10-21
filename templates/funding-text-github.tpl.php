@@ -1,0 +1,1 @@
+<a href="https://github.com/sponsors/<?php print check_plain($config) ?>" target="_blank">Github</a>
